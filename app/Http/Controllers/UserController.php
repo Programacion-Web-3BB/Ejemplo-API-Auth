@@ -16,6 +16,30 @@ use \Illuminate\Database\QueryException;
 class UserController extends Controller
 {
     public function Create(Request $request){
+        $validation = validateCreation($request);
+
+        if($validation !== "true")
+            return $validation;
+
+        try {
+            return createUser($request);
+        }
+        catch (QueryException $e){
+            return handleCreateErrors($$e);
+        }
+    }
+
+    public function Authenticate(Request $request){
+        $validation = validateAuthentication($request);
+
+        if($validation !== "true")
+            return $validation;
+
+        return doAuthentication($request->only('email', 'password'));
+    }
+
+
+    private function validateCreation($request){
         $validator = Validator::make($request->all(),[
             'name' => 'required',
             'email' => 'required',
@@ -23,42 +47,52 @@ class UserController extends Controller
             'password_confirmation' => 'required|min:6'
         ]);
 
-        if ($validator -> fails())
+        if($validator -> fails())
             return $validator->errors()->toJson();
-
+        
         if($request -> post("password") !== $request -> post("password_confirmation"))
             return [ "password" => "Both passwords don't match"];
-
-        try {
-            return User::create([
-                'name' => $request -> post("name"),
-                'email' => $request -> post("email"),
-                'password' => Hash::make($request -> post("password"))
-            ]);
-        }
-        catch (QueryException $e){
-            return [
-                "error" => 'User ' . $request->post("name") . ' exists',
-                "trace" => $e -> getMessage()
-            ];
-        }
+        
+        return "true";
     }
 
-    public function Authenticate(Request $request){
+    private function createUser($request){
+        return User::create([
+            'name' => $request -> post("name"),
+            'email' => $request -> post("email"),
+            'password' => Hash::make($request -> post("password"))
+        ]);
+    }
+    
+    private function handleCreateErrors($e){
+        return [
+            "error" => 'User ' . $request->post("name") . ' exists',
+            "trace" => $e -> getMessage()
+        ];
+    }
+
+
+    private function validateAuthentication($request){
         $validator = Validator::make($request->all(),[
             'email' => 'required',
             'password' => 'required|min:6'
         ]);
 
-        if ($validator->fails())
+        if ($validator->fails()) 
             return $validator->errors()->toJson();
+        return "true";
+    }
 
-        $credentials = $request->only('email', 'password');
-
-        if(!Auth::attempt($credentials))
+    private function doAuthentication($credentials){
+        if(Auth::attempt($credentials))
             return [
-                'Status' => false,
-                'Result' => "No Popotico"
+                'Status' => true,
+                'Result' => "Popotico"
             ];
+    
+        return [
+            'Status' => false,
+            'Result' => "No Popotico"
+        ];
     }
 }
